@@ -18,7 +18,14 @@ const ContactsPage = ({ navigation }) => {
         <Image
           height={24}
           source={require('../assets/logo-dark.png')}
-          style={{ resizeMode: 'contain', height: 24, position: 'absolute', left: '38%', transform: [{ translateX: -50 }], top: 4 }}
+          style={{
+            resizeMode: 'contain',
+            height: 24,
+            position: 'absolute',
+            left: '38%',
+            transform: [{ translateX: -50 }],
+            top: 2,
+          }}
         />
       </View>
       <View style={{ padding: 24, paddingTop: 0 }}>

@@ -1,12 +1,19 @@
 import React from 'react';
 import { View, StyleSheet, Image, ActivityIndicator } from 'react-native';
-import { FAB, Modal, Searchbar, Text, TextInput, Button as PaperButton } from 'react-native-paper';
+import {
+  FAB,
+  Modal,
+  Searchbar,
+  Text,
+  TextInput,
+  Button as PaperButton,
+} from 'react-native-paper';
 import ChatList from './ChatList';
 import Icon from 'react-native-vector-icons/FontAwesome';
-import CountryPicker from "rn-country-picker";
-import { getChatToken } from '../services';
+import CountryPicker from 'rn-country-picker';
+import { CHAT_URL, getChatToken } from '../services';
 import { useSelector } from 'react-redux';
-import SignalRConnection from '../signalr'
+import SignalRConnection from '../signalr';
 
 const ChatPage = ({ navigation }) => {
   const userInfo = useSelector(state => state?.userInfo);
@@ -17,7 +24,7 @@ const ChatPage = ({ navigation }) => {
   const [inputValue, setInputValue] = React.useState('');
   const [isLoading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(false);
-  const [errorMessage, setErrorMessage] = React.useState("");
+  const [errorMessage, setErrorMessage] = React.useState('');
   const [countryCode, setCountryCode] = React.useState('1');
 
   const validatePhoneNumber = (phoneNumber: any) => {
@@ -27,51 +34,64 @@ const ChatPage = ({ navigation }) => {
 
   const createConversation = async () => {
     if (!validatePhoneNumber(inputValue)) {
-      setErrorMessage("Phone Number is not valid.");
+      setErrorMessage('Phone Number is not valid.');
       setError(true);
       return;
     }
-    const exists = chatList?.chatList.filter(item => item.target === inputValue).length > 0;
+    const exists =
+      chatList?.chatList.filter(item => item.target === inputValue).length > 0;
     if (exists) {
-      setErrorMessage("Phone Number alredy exist.");
+      setErrorMessage('Phone Number already exist.');
       setError(true);
       return;
+    }
+
+    const connection = await SignalRConnection.getConnection();
+    if (connection && connection.state === 'Disconnected') {
+      SignalRConnection.init(CHAT_URL);
     }
 
     setLoading(true);
     function generateGUID() {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-      });
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(
+        /[xy]/g,
+        function (c) {
+          var r = (Math.random() * 16) | 0,
+            v = c === 'x' ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        },
+      );
     }
 
-    const response = await getChatToken(userInfo?.userInfo?.accountId, userAuth?.userAuth);
+    const response = await getChatToken(
+      userInfo?.userInfo?.accountId,
+      userAuth?.userAuth,
+    );
 
     let authPayload = {
-      command: "authorization",
+      command: 'authorization',
       messageId: generateGUID(),
       payload: {
         username: userInfo?.userInfo?.email,
         password: response?.data?.token,
-        nickname: userInfo?.userInfo?.firstName
-      }
-    }
+        nickname: userInfo?.userInfo?.firstName,
+      },
+    };
     SignalRConnection.sendMessage('ToServer', authPayload);
 
     let summonPayload = {
-      command: "summon",
+      command: 'summon',
       messageId: generateGUID(),
       payload: {
         target: inputValue,
-        channelType: 0
-      }
-    }
+        channelType: 0,
+      },
+    };
     SignalRConnection.sendMessage('ToServer', summonPayload);
     setLoading(false);
     setVisible(false);
     setInputValue('');
-  }
+  };
 
   const showModal = () => setVisible(true);
 
@@ -83,8 +103,8 @@ const ChatPage = ({ navigation }) => {
     setError(false);
   };
 
-  const selectedValue = (value) => {
-    console.log(value)
+  const selectedValue = value => {
+    console.log(value);
     setCountryCode(value?.callingCode);
   };
 
@@ -95,13 +115,20 @@ const ChatPage = ({ navigation }) => {
           flexDirection: 'row',
           paddingHorizontal: 24,
           justifyContent: 'flex-start',
-          alignItems: 'center'
+          alignItems: 'center',
         }}>
         <Text style={styles.header}>Chats</Text>
         <Image
           height={24}
           source={require('../assets/logo-dark.png')}
-          style={{ resizeMode: 'contain', height: 24, position: 'absolute', left: '38%', transform: [{ translateX: -50 }], top: 4 }}
+          style={{
+            resizeMode: 'contain',
+            height: 24,
+            position: 'absolute',
+            left: '38%',
+            transform: [{ translateX: -50 }],
+            top: 2,
+          }}
         />
       </View>
 
@@ -125,8 +152,17 @@ const ChatPage = ({ navigation }) => {
         onPress={() => showModal()}
       />
 
-      <Modal visible={visible} contentContainerStyle={{ backgroundColor: 'white', padding: 20, marginHorizontal: 20 }}>
-        <Text style={{ marginBottom: 20, fontSize: 16, fontWeight: 'bold' }}>New Chat</Text>
+      <Modal
+        visible={visible}
+        contentContainerStyle={{
+          backgroundColor: 'white',
+          padding: 20,
+          marginHorizontal: 20,
+          borderRadius: 16,
+        }}>
+        <Text style={{ marginBottom: 20, fontSize: 16, fontWeight: 'bold' }}>
+          New Chat
+        </Text>
         {/* <CountryPicker
           animationType={"slide"}
           language="en"
@@ -135,32 +171,44 @@ const ChatPage = ({ navigation }) => {
           selectedValue={selectedValue}
         /> */}
         <TextInput
-          mode='outlined'
+          mode="outlined"
           label="Enter phone number..."
           value={inputValue}
-          onChangeText={(text) => { setInputValue(text); setError(false); }}
+          onChangeText={text => {
+            setInputValue(text);
+            setError(false);
+          }}
           style={{ marginBottom: 10 }}
         />
-        {error && <Text style={{ marginBottom: 20, fontSize: 14, color: 'red' }}>{errorMessage}</Text>}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: error ? 0 : 10 }}>
-          <PaperButton mode="contained" style={{ flex: 1, marginRight: 10 }} onPress={createConversation}>
+        {error && (
+          <Text style={{ marginBottom: 20, fontSize: 14, color: 'red' }}>
+            {errorMessage}
+          </Text>
+        )}
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            marginTop: error ? 0 : 10,
+          }}>
+          <PaperButton
+            mode="contained"
+            style={{ flex: 1, marginRight: 10 }}
+            onPress={createConversation}>
             Start
           </PaperButton>
-          <PaperButton mode="outlined" style={{ flex: 1 }} onPress={handleCancel} >
+          <PaperButton mode="outlined" style={{ flex: 1 }} onPress={handleCancel}>
             Cancel
           </PaperButton>
         </View>
       </Modal>
 
-      {isLoading &&
+      {isLoading && (
         <View style={styles.loaderContainer}>
-          <ActivityIndicator
-            animating={true}
-            size="large"
-            color={'#5664d2'}
-          />
+          <ActivityIndicator animating={true} size="large" color={'#5664d2'} />
           <Text style={styles.text}>Loading...</Text>
-        </View>}
+        </View>
+      )}
     </View>
   );
 };
@@ -176,12 +224,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 16,
     flex: 1,
-    textAlign: 'left'
+    textAlign: 'left',
   },
   text: {
     fontSize: 16,
     marginTop: 20,
-    textAlign: 'center'
+    textAlign: 'center',
   },
   searchBar: {
     height: 40,
@@ -205,7 +253,7 @@ const styles = StyleSheet.create({
     height: '100%',
     width: '100%',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.25)'
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
   },
 });
 

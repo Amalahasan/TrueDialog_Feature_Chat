@@ -21,8 +21,6 @@ const HomePage = ({ route }) => {
         name="Chat"
         component={ChatPage}
         options={{
-          tabBarBadge: '0',
-          tabBarBadgeStyle: { backgroundColor: '#ff3d60' },
           tabBarIcon: ({ focused }) => <Icon color={focused ? '#5664d2' : '#ccc'} name="comment" size={24} />,
           tabBarLabel: 'Chats',
         }}

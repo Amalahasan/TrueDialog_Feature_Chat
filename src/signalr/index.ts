@@ -69,6 +69,10 @@ class SignalRConnection {
             });
         }
     }
+
+    getConnection() {
+        return this.connection;
+    }
 }
 
 export default new SignalRConnection();

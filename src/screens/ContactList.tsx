@@ -64,14 +64,15 @@ const ContactsList = ({ navigation, query }) => {
 
   const renderContactItem = ({ item }) => {
     const timestamp = item?.modified;
-    const now = new Date(timestamp);
+    const now = new Date(timestamp + 'Z');
     const formattedDate = `${(now.getMonth() + 1)
       .toString()
       .padStart(2, '0')}/${now.getDate().toString().padStart(2, '0')}`;
-    const formattedTime = `${now.getHours().toString().padStart(2, '0')}:${now
+    const amPm = now.getHours() >= 12 ? 'PM' : 'AM';
+    const formattedTime = `${now.getHours() % 12}:${now
       .getMinutes()
       .toString()
-      .padStart(2, '0')}`;
+      .padStart(2, '0')} ${amPm}`;
 
     return (
       <>

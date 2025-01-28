@@ -12,9 +12,10 @@ import {
 import { Text, Avatar, Appbar } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { useSelector } from 'react-redux';
-import { fetchChatDetails, getChatToken } from '../services';
+import { CHAT_URL, fetchChatDetails, getChatToken } from '../services';
 import { store } from '../redux/store';
-import SignalRConnection from '../signalr'
+import SignalRConnection from '../signalr';
+import { useFocusEffect } from '@react-navigation/native';
 
 const ChatDetailPage = ({ route, navigation }) => {
   const { data } = route?.params;
@@ -24,6 +25,22 @@ const ChatDetailPage = ({ route, navigation }) => {
   const userAuth = useSelector(state => state?.userAuth);
   const userInfo = useSelector(state => state?.userInfo);
   const chatDetails = useSelector(state => state?.chatDetails);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      // This will run when the screen is focused
+      store.dispatch({
+        type: 'ACTIVE_CONVERSATION_ID',
+        payload: data?.id,
+      });
+      return () => {
+        store.dispatch({
+          type: 'ACTIVE_CONVERSATION_ID',
+          payload: "",
+        });
+      };
+    }, [])
+  );
 
   useEffect(() => {
     setMessages(chatDetails?.[data?.id]);
@@ -50,52 +67,83 @@ const ChatDetailPage = ({ route, navigation }) => {
     }
   };
 
-  const sendMessage = async () => {
-    function generateGUID() {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+  function generateGUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(
+      /[xy]/g,
+      function (c) {
+        var r = (Math.random() * 16) | 0,
+          v = c === 'x' ? r : (r & 0x3) | 0x8;
         return v.toString(16);
-      });
-    }
+      },
+    );
+  }
 
-    const response = await getChatToken(userInfo?.userInfo?.accountId, userAuth?.userAuth);
-
+  const chatAuthorization = async () => {
+    const response = await getChatToken(
+      userInfo?.userInfo?.accountId,
+      userAuth?.userAuth,
+    );
     let payload = {
-      command: "authorization",
+      command: 'authorization',
       messageId: generateGUID(),
       payload: {
         username: userInfo?.userInfo?.email,
         password: response?.data?.token,
-        nickname: userInfo?.userInfo?.firstName
-      }
-    }
+        nickname: userInfo?.userInfo?.firstName,
+      },
+    };
     SignalRConnection.sendMessage('ToServer', payload);
 
+    //to mark as viewed
+    if (data?.unread > 0) {
+      let command = {
+        command: 'viewed',
+        messageId: generateGUID(),
+        payload: {
+          conversationId: data?.id,
+          viewed: true,
+        },
+      };
+      SignalRConnection.sendMessage('ToServer', command);
+    }
+  };
+
+  const sendMessage = async () => {
+    const connection = await SignalRConnection.getConnection();
+    if (connection && connection.state === 'Disconnected') {
+      SignalRConnection.init(CHAT_URL);
+    }
+
+    chatAuthorization();
     let command = {
-      command: "message",
+      command: 'message',
       messageId: generateGUID(),
       payload: {
         conversationId: data?.id,
         target: data?.target,
         message: message,
         mediaIds: [],
-        channelType: 0
-      }
-    }
+        channelType: 0,
+      },
+    };
     SignalRConnection.sendMessage('ToServer', command);
-  }
+  };
 
   useEffect(() => {
+    chatAuthorization();
     getChats();
   }, []);
 
   const handleSend = async () => {
     if (message.trim()) {
+      const date = new Date();
+      const isoDate = date.toISOString();
+      const formattedDate = isoDate.slice(0, 19);
       const newMessage = {
         id: `${messages.length + 1}`,
         message: message,
         user: 'John',
-        logDate: Date.now(),
+        logDate: formattedDate,
         isSent: true,
         channelCode: '26246',
       };
@@ -107,14 +155,16 @@ const ChatDetailPage = ({ route, navigation }) => {
 
   const renderMessage = ({ item }) => {
     const timestamp = item?.logDate;
-    const now = new Date(timestamp);
+    const now = new Date(timestamp + 'Z');
     const formattedDate = `${(now.getMonth() + 1)
       .toString()
       .padStart(2, '0')}/${now.getDate().toString().padStart(2, '0')}`;
-    const formattedTime = `${now.getHours().toString().padStart(2, '0')}:${now
+    const amPm = now.getHours() >= 12 ? 'PM' : 'AM';
+    const formattedTime = `${now.getHours() % 12}:${now
       .getMinutes()
       .toString()
-      .padStart(2, '0')}`;
+      .padStart(2, '0')} ${amPm}`;
+
     if (item?.message) {
       return (
         <View
@@ -122,17 +172,19 @@ const ChatDetailPage = ({ route, navigation }) => {
             styles.messageContainer,
             item.incoming ? styles.receivedMessage : styles.sentMessage,
           ]}>
-          <Avatar.Text
-            style={{ backgroundColor: '#eff2f7' }}
-            label={'#'}
-            size={48}
-          />
           <View style={styles.messageContent}>
-            <Text style={styles.messageText}>{item.message}</Text>
             <Text
-              style={
-                styles.timestamp
-              }>{`${formattedDate} ${formattedTime}`}</Text>
+              style={[
+                styles.messageText,
+                item.incoming ? styles.incomingBorder : styles.outgoingBorder,
+              ]}>
+              {item.message}
+            </Text>
+            <Text
+              style={[
+                styles.timestamp,
+                { textAlign: item.incoming ? 'left' : 'right' },
+              ]}>{`${formattedDate} ${formattedTime}`}</Text>
           </View>
         </View>
       );
@@ -141,14 +193,15 @@ const ChatDetailPage = ({ route, navigation }) => {
 
   const getMessageLength = (message: any) => {
     if (message.length > 160) {
-      return 160 - (message.length % 160)
+      return 160 - (message.length % 160);
     }
     return 160 - message.length;
-  }
+  };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Appbar.Header style={{ backgroundColor: '#fff' }} elevated>
         <Appbar.BackAction onPress={() => navigation.goBack()} />
@@ -178,8 +231,10 @@ const ChatDetailPage = ({ route, navigation }) => {
       </View>
 
       <View style={styles.inputContainer}>
-        <Text style={{ position: 'absolute', top: 4, left: 16, color: '#505d69' }}>
-          Messages: {parseInt(((message.length / 161) + 1))} Remaining: {getMessageLength(message) == 0 ? 160 : getMessageLength(message)}
+        <Text
+          style={{ position: 'absolute', top: 4, left: 16, color: '#505d69' }}>
+          Messages: {parseInt(message.length / 161 + 1)} Remaining:{' '}
+          {getMessageLength(message) == 0 ? 160 : getMessageLength(message)}
         </Text>
         <TextInput
           multiline
@@ -237,9 +292,24 @@ const styles = StyleSheet.create({
     marginVertical: 5,
     fontSize: 16,
     backgroundColor: '#5664d2',
-    padding: 12,
+    padding: 16,
     color: '#fff',
-    borderRadius: 6,
+  },
+  outgoingBorder: {
+    borderBottomEndRadius: 0,
+    borderBottomStartRadius: 24,
+    borderTopStartRadius: 24,
+    borderTopEndRadius: 16,
+    backgroundColor: '#5664d2',
+    color: '#fff',
+  },
+  incomingBorder: {
+    borderBottomEndRadius: 24,
+    borderBottomStartRadius: 16,
+    borderTopStartRadius: 0,
+    borderTopEndRadius: 24,
+    backgroundColor: '#E8E8E8',
+    color: '#000',
   },
   timestamp: {
     fontSize: 12,
@@ -251,7 +321,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderTopWidth: 1,
     borderTopColor: '#ddd',
-    paddingTop: 24
+    paddingTop: 24,
   },
   input: {
     flex: 1,

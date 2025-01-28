@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Modal, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { AppState, Modal, SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { PaperProvider, DefaultTheme, Button, Snackbar } from 'react-native-paper';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
@@ -8,7 +8,7 @@ import { store, persistor } from './src/redux/store';
 import AppNavigator from './src/navigation/AppNavigator';
 import 'react-native-url-polyfill/auto';
 import SignalRConnection from './src/signalr'
-import { CHAT_URL, fetchChatInfo } from './src/services';
+import { CHAT_URL, fetchChatDetails, fetchChatInfo, getChatToken } from './src/services';
 
 const App = () => {
   const [visible, setVisible] = useState(false);
@@ -32,17 +32,102 @@ const App = () => {
     }
   };
 
-  const handleMessage = (message) => {
+  const getChats = async (id: any) => {
+    try {
+      const response = await fetchChatDetails(
+        store.getState()?.userInfo?.userInfo?.accountId,
+        id,
+        store.getState()?.userAuth?.userAuth,
+      );
+      if (response?.data) {
+        store.dispatch({
+          type: 'CHAT_DETAILS',
+          payload: { data: response?.data, id: id },
+        });
+      }
+    } catch (err) {
+      console.error('Error:', err);
+    }
+  };
+
+  function generateGUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(
+      /[xy]/g,
+      function (c) {
+        var r = (Math.random() * 16) | 0,
+          v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      },
+    );
+  }
+
+  const chatAuthorization = async (id: any) => {
+    //marking as viewed when user in the same converation
+    let currentConversationId = store.getState()?.userInfo?.conversationId;
+    if (currentConversationId === id) {
+      const response = await getChatToken(
+        store.getState()?.userInfo?.userInfo?.accountId,
+        store.getState()?.userAuth?.userAuth,
+      );
+      let payload = {
+        command: 'authorization',
+        messageId: generateGUID(),
+        payload: {
+          username: store.getState()?.userInfo?.userInfo?.email,
+          password: response?.data?.token,
+          nickname: store.getState()?.userInfo?.userInfo?.firstName,
+        },
+      };
+      SignalRConnection.sendMessage('ToServer', payload);
+
+      let command = {
+        command: 'viewed',
+        messageId: generateGUID(),
+        payload: {
+          conversationId: id,
+          viewed: true,
+        },
+      };
+      SignalRConnection.sendMessage('ToServer', command);
+    }
+  };
+
+  const handleMessage = useCallback((message: any) => {
     console.log("received message", message);
     switch (message?.command) {
       case "notifyDeliveryStatus":
-        setSnackMessage("Message delivered successfully!")
+        setSnackMessage("Message delivered successfully!");
         setSnackVisible(true);
         refreshChats();
+        getChats(message?.payload?.conversationId);
         break;
       case "notifyConversationCreated":
         setSnackMessage("New chat created successfully!")
         setSnackVisible(true);
+        refreshChats();
+        break;
+      case "incoming":
+        setSnackMessage("New message from " + message?.payload.sender + "\n\n " + message?.payload.message)
+        setSnackVisible(true);
+        const date = new Date();
+
+        chatAuthorization(message?.payload?.conversationId);
+
+        const newMessage = {
+          id: message?.messageId,
+          message: message?.payload?.message,
+          logDate: date.toISOString().slice(0, 19),
+          isSent: true,
+          incoming: true,
+          channelCode: message?.payload?.accountId,
+        };
+        store.dispatch({
+          type: 'CHAT_DETAILS',
+          payload: {
+            data: [newMessage, ...store.getState()?.chatDetails?.[message?.payload?.conversationId]],
+            id: message?.payload?.conversationId
+          },
+        });
         refreshChats();
         break;
       case "ok":
@@ -51,9 +136,21 @@ const App = () => {
       default:
         break;
     }
+  }, [store]);
+
+  const handleAppStateChange = (nextAppState) => {
+    if (nextAppState === 'active') {
+      refreshChats();
+      const connection = SignalRConnection.getConnection();
+      if (connection && connection.state === "Disconnected") {
+        SignalRConnection.init(CHAT_URL);
+      }
+    }
   };
 
+
   useEffect(() => {
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
     const unsubscribe = NetInfo.addEventListener(state => {
       if (state.isConnected) {
         setVisible(false);
@@ -66,6 +163,7 @@ const App = () => {
     return () => {
       unsubscribe()
       SignalRConnection.stopConnection();
+      subscription.remove();
     };
   }, []);
 

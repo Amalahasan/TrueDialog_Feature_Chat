@@ -64,14 +64,15 @@ const ChatList = ({ navigation, query }) => {
 
   const renderChatItem = ({ item }) => {
     const timestamp = item?.lastMessageDate;
-    const now = new Date(timestamp);
+    const now = new Date(timestamp + 'Z');
     const formattedDate = `${(now.getMonth() + 1)
       .toString()
       .padStart(2, '0')}/${now.getDate().toString().padStart(2, '0')}`;
-    const formattedTime = `${now.getHours().toString().padStart(2, '0')}:${now
+    const amPm = now.getHours() >= 12 ? 'PM' : 'AM';
+    const formattedTime = `${now.getHours() % 12}:${now
       .getMinutes()
       .toString()
-      .padStart(2, '0')}`;
+      .padStart(2, '0')} ${amPm}`;
     return (
       <>
         <List.Item
@@ -81,7 +82,21 @@ const ChatList = ({ navigation, query }) => {
           title={item.target}
           descriptionNumberOfLines={1}
           description={item.lastMessage}
-          left={() => <Avatar.Text size={36} label={'#'} />}
+          left={() => (
+            <>
+              <Avatar.Text size={36} label={'#'} />
+              {item.unread > 0 && (
+                <View
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: 5,
+                    backgroundColor: 'green',
+                  }}
+                />
+              )}
+            </>
+          )}
           right={() => (
             <Text style={[styles.time, { color: theme.colors.placeholder }]}>
               {`${formattedDate} ${formattedTime}`}
@@ -131,7 +146,7 @@ const styles = StyleSheet.create({
   time: {
     fontSize: 12,
     alignSelf: 'flex-start',
-    paddingTop: 8
+    paddingTop: 8,
   },
   loaderContainer: {
     flex: 1,

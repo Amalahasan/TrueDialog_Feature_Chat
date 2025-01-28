@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Image, Linking } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  Linking,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import {
   TextInput,
   Button,
@@ -12,8 +20,8 @@ import { store } from '../redux/store';
 import { fetchUserInfo } from '../services';
 
 const LoginPage = ({ navigation }) => {
-  const [email, setEmail] = useState('suresh@valarpro.com');
-  const [password, setPassword] = useState('tru3T35t!1');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setLoading] = useState(false);
   const [usernameError, setUsernameError] = useState('');
   const [passwordError, setPasswordError] = useState('');
@@ -82,19 +90,17 @@ const LoginPage = ({ navigation }) => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: '#fff' }]}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <Card style={styles.card} elevation={0}>
         <Card.Content>
           <Image
-            style={{
-              justifyContent: 'center',
-              alignSelf: 'center',
-              marginBottom: 24,
-            }}
+            style={styles.logo}
             source={require('../assets/logo-dark.png')}
           />
-          <Title style={[styles.title, { fontSize: 18 }]}>Welcome Back!</Title>
-          <Title style={{ fontSize: 14, textAlign: 'center', marginBottom: 24 }}>
+          <Title style={styles.title}>Welcome Back!</Title>
+          <Title style={styles.subTitle}>
             Sign in to continue to TrueDialog.
           </Title>
           <TextInput
@@ -111,7 +117,7 @@ const LoginPage = ({ navigation }) => {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
-            style={styles.input}
+            style={[styles.input, { marginTop: 8 }]}
             mode="outlined"
           />
           {passwordError && <Text style={{ color: 'red' }}>{passwordError}</Text>}
@@ -140,7 +146,7 @@ const LoginPage = ({ navigation }) => {
           </View>
         </Card.Content>
       </Card>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -149,6 +155,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     padding: 16,
+    backgroundColor: '#fff',
+  },
+  logo: {
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: 24,
   },
   card: {
     margin: 16,
@@ -156,9 +168,15 @@ const styles = StyleSheet.create({
   },
   title: {
     textAlign: 'center',
+    fontSize: 18,
+  },
+  subTitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 24,
   },
   input: {
-    marginBottom: 12,
+    marginBottom: 4,
   },
   button: {
     marginTop: 16,

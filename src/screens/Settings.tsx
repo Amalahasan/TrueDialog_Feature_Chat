@@ -1,10 +1,10 @@
 import React from 'react';
-import {View, StyleSheet, ScrollView} from 'react-native';
-import {Avatar, Button, Card, Title, Paragraph, Text} from 'react-native-paper';
-import {useSelector} from 'react-redux';
-import {store} from '../redux/store';
+import { View, StyleSheet, ScrollView } from 'react-native';
+import { Avatar, Button, Card, Title, Paragraph, Text } from 'react-native-paper';
+import { useSelector } from 'react-redux';
+import { store } from '../redux/store';
 
-const ProfilePage = ({navigation}) => {
+const ProfilePage = ({ navigation }) => {
   const userInfo = useSelector(state => state?.userInfo);
 
   const handleSignOut = () => {
@@ -27,7 +27,7 @@ const ProfilePage = ({navigation}) => {
   };
 
   return (
-    <ScrollView style={[styles.container, {backgroundColor: '#fff'}]}>
+    <ScrollView style={[styles.container, { backgroundColor: '#fff' }]}>
       {/* User's Name */}
       <Card style={styles.card} elevation={0}>
         <Card.Content style={styles.cardContent}>
@@ -61,7 +61,7 @@ const ProfilePage = ({navigation}) => {
         </Card.Content>
       </Card>
 
-      <View style={{marginHorizontal: 16}}>
+      <View style={{ marginHorizontal: 16 }}>
         {/* Sign Out Button */}
         <Button mode="contained" onPress={handleSignOut} style={styles.button}>
           Sign Out
@@ -70,7 +70,7 @@ const ProfilePage = ({navigation}) => {
 
       {/* App Version */}
       <View style={styles.versionContainer}>
-        <Text style={styles.versionText}>Version 1.0.0</Text>
+        <Text style={styles.versionText}>Version 1.0.0 (4)</Text>
       </View>
     </ScrollView>
   );
